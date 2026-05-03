@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Data files (too large for GitHub)
+data/raw/
+data/warehouse/
+data/curated/
+data/powerbi/
+*.csv
+*.parquet
+
+# Environment
+.env
+*.env
+config_secret.yaml
+
+# Docker volumes
+docker/hadoop_*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.log
+.DS_Store
+
+# Runtime state
+state/*.json
+
+# Data outputs (keep .gitkeep placeholders)
+data/raw/
+data/curated/
+data/warehouse/
+data/powerbi/

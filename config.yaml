@@ -1,0 +1,38 @@
+project:
+  name: financial-market-monitoring-pipeline
+  timezone: UTC
+
+market:
+  tickers:
+    - AAPL
+    - MSFT
+    - BTC-USD
+  default_start_date: "2023-01-01"
+  interval: "1d"
+
+features:
+  ma_window_days: 7
+  rsi_period_days: 14
+
+paths:
+  raw: data/raw
+  curated: data/curated
+  warehouse: data/warehouse
+  state_file: state/state.json
+  validation_report: data/curated/validation_report.json
+
+validation:
+  enabled: true
+  fail_on_error: true
+  max_null_ratio: 0.01
+  min_expected_fact_rows: 10
+
+warehouse:
+  mode: simulate  # values: simulate | snowflake
+  database: FINANCE_DB
+  schema: MARKET_ANALYTICS
+  warehouse_name: COMPUTE_WH
+  role: SYSADMIN
+  user_env_var: SNOWFLAKE_USER
+  password_env_var: SNOWFLAKE_PASSWORD
+  account_env_var: SNOWFLAKE_ACCOUNT
