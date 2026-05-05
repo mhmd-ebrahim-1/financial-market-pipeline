@@ -221,10 +221,7 @@ _write_single_csv(fact, WAREHOUSE_PATH / "Fact_Market_Trades.csv")
 _write_single_csv(dim_stocks, WAREHOUSE_PATH / "Dim_Stocks.csv")
 _write_single_csv(dim_date, WAREHOUSE_PATH / "Dim_Date.csv")
 
-print(">>> Writing curated CSV...")
-curated = df.select("symbol", "date", "openprice", "closeprice", "volume")
-_write_single_csv(curated, CURATED_PATH / "market_data_curated.csv")
-
+print(">>> Skipping curated CSV (not required)...")
 # ─────────────────────────────────────────
 # 7. التحقق
 # ─────────────────────────────────────────

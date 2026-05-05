@@ -28,11 +28,11 @@ validation:
   min_expected_fact_rows: 10
 
 warehouse:
-  mode: simulate  # values: simulate | snowflake
-  database: FINANCE_DB
-  schema: MARKET_ANALYTICS
+  mode: snowflake
+  database: MARKET_DWH
+  schema: GOLD
   warehouse_name: COMPUTE_WH
-  role: SYSADMIN
+  role: ACCOUNTADMIN
   user_env_var: SNOWFLAKE_USER
   password_env_var: SNOWFLAKE_PASSWORD
   account_env_var: SNOWFLAKE_ACCOUNT

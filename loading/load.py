@@ -35,13 +35,13 @@ USE WAREHOUSE {warehouse_name};
 CREATE SCHEMA IF NOT EXISTS {schema};
 USE SCHEMA {schema};
 
-CREATE OR REPLACE TABLE DIM_STOCKS (
+CREATE TABLE IF NOT EXISTS DIM_STOCKS (
     TICKERID INTEGER,
     SYMBOL STRING,
     COMPANYNAME STRING
 );
 
-CREATE OR REPLACE TABLE DIM_DATE (
+CREATE TABLE IF NOT EXISTS DIM_DATE (
     DATEID INTEGER,
     FULLDATE DATE,
     YEAR INTEGER,
@@ -49,7 +49,7 @@ CREATE OR REPLACE TABLE DIM_DATE (
     DAY INTEGER
 );
 
-CREATE OR REPLACE TABLE FACT_MARKET_TRADES (
+CREATE TABLE IF NOT EXISTS FACT_MARKET_TRADES (
     TRADEID INTEGER,
     TICKERID INTEGER,
     DATEID INTEGER,
@@ -61,32 +61,14 @@ CREATE OR REPLACE TABLE FACT_MARKET_TRADES (
 );
 """.strip()
 
-    def _build_copy_sql(self) -> str:
-        lines = [
-            "CREATE OR REPLACE FILE FORMAT MARKET_CSV_FORMAT TYPE='CSV' SKIP_HEADER=1 FIELD_OPTIONALLY_ENCLOSED_BY='\"';",
-            "CREATE OR REPLACE STAGE MARKET_STAGE FILE_FORMAT = MARKET_CSV_FORMAT;",
-        ]
-
-        for table, file_path in self._table_file_map().items():
-            absolute = file_path.resolve().as_posix()
-            file_name = file_path.name
-            lines.append(f"PUT 'file://{absolute}' @MARKET_STAGE AUTO_COMPRESS=TRUE OVERWRITE=TRUE;")
-            lines.append(
-                f"COPY INTO {table} FROM @MARKET_STAGE/{file_name}.gz FILE_FORMAT=(FORMAT_NAME=MARKET_CSV_FORMAT) ON_ERROR='CONTINUE';"
-            )
-
-        return "\n".join(lines)
-
     def _write_sql_artifacts(self) -> Dict[str, Path]:
         project_root = self.paths["warehouse"].parents[1]
         sql_dir = ensure_dir(project_root / "loading" / "sql")
         ddl_path = sql_dir / "ddl.sql"
-        copy_path = sql_dir / "copy_into.sql"
 
         ddl_path.write_text(self._build_ddl_sql(), encoding="utf-8")
-        copy_path.write_text(self._build_copy_sql(), encoding="utf-8")
 
-        return {"ddl": ddl_path, "copy": copy_path}
+        return {"ddl": ddl_path}
 
     def _simulate_load(self) -> Dict[str, Any]:
         table_files = self._table_file_map()
@@ -107,10 +89,12 @@ CREATE OR REPLACE TABLE FACT_MARKET_TRADES (
 
     def _execute_snowflake(self) -> Dict[str, Any]:
         try:
+            import pandas as pd
             import snowflake.connector
-        except ImportError as exc:  # pragma: no cover
+            from snowflake.connector.pandas_tools import write_pandas
+        except ImportError as exc:
             raise ImportError(
-                "snowflake-connector-python is required for Snowflake mode."
+                "snowflake-connector-python and pandas are required for Snowflake mode."
             ) from exc
 
         user = os.getenv(self.wh_config["user_env_var"])
@@ -123,7 +107,11 @@ CREATE OR REPLACE TABLE FACT_MARKET_TRADES (
             )
 
         table_files = self._table_file_map()
-        sql_files = self._write_sql_artifacts()
+
+        # التحقق من وجود الـ files
+        missing = [name for name, f in table_files.items() if not f.exists()]
+        if missing:
+            raise FileNotFoundError(f"Missing warehouse files: {', '.join(missing)}")
 
         conn = snowflake.connector.connect(
             user=user,
@@ -135,34 +123,46 @@ CREATE OR REPLACE TABLE FACT_MARKET_TRADES (
             role=self.wh_config["role"],
         )
 
+        rows_loaded = {}
+
         try:
-            with conn.cursor() as cur:
-                for statement in self._build_ddl_sql().split(";"):
-                    stmt = statement.strip()
-                    if stmt:
-                        cur.execute(stmt)
+            cursor = conn.cursor()
 
-                cur.execute(
-                    "CREATE OR REPLACE FILE FORMAT MARKET_CSV_FORMAT TYPE='CSV' SKIP_HEADER=1 FIELD_OPTIONALLY_ENCLOSED_BY='\"'"
+            # إنشاء الـ tables لو مش موجودة
+            for statement in self._build_ddl_sql().split(";"):
+                stmt = statement.strip()
+                if stmt:
+                    cursor.execute(stmt)
+
+            # تحميل كل table بـ TRUNCATE + write_pandas
+            for table, file_path in table_files.items():
+                df = pd.read_csv(file_path)
+                df.columns = [c.upper() for c in df.columns]
+
+                # مسح البيانات القديمة
+                cursor.execute(f"TRUNCATE TABLE {table}")
+
+                # تحميل البيانات الجديدة
+                success, nchunks, nrows, _ = write_pandas(
+                    conn, df, table,
+                    database=self.wh_config["database"],
+                    schema=self.wh_config["schema"]
                 )
-                cur.execute("CREATE OR REPLACE STAGE MARKET_STAGE FILE_FORMAT = MARKET_CSV_FORMAT")
 
-                for table, file_path in table_files.items():
-                    absolute = file_path.resolve().as_posix()
-                    file_name = file_path.name
-                    cur.execute(
-                        f"PUT 'file://{absolute}' @MARKET_STAGE AUTO_COMPRESS=TRUE OVERWRITE=TRUE"
-                    )
-                    cur.execute(
-                        f"COPY INTO {table} FROM @MARKET_STAGE/{file_name}.gz FILE_FORMAT=(FORMAT_NAME=MARKET_CSV_FORMAT) ON_ERROR='CONTINUE'"
-                    )
+                rows_loaded[table] = nrows
+                self.logger.info("Loaded %s rows into %s", nrows, table)
+
+            cursor.close()
+
         finally:
             conn.close()
+
+        self.logger.info("Snowflake load complete: %s", rows_loaded)
 
         return {
             "mode": "snowflake",
             "tables_loaded": list(table_files.keys()),
-            "sql_files": {k: str(v) for k, v in sql_files.items()},
+            "rows_loaded": rows_loaded,
         }
 
     def run(self) -> Dict[str, Any]:

@@ -112,7 +112,10 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       AIRFLOW__WEBSERVER__SECRET_KEY: 'change_me_airflow_secret_key'
-      _PIP_ADDITIONAL_REQUIREMENTS: "yfinance==0.2.38 pandas pyyaml multitasking==0.0.9"
+      _PIP_ADDITIONAL_REQUIREMENTS: "yfinance==0.2.38 pandas pyyaml multitasking==0.0.9 snowflake-connector-python"
+      SNOWFLAKE_USER: mhmd1
+      SNOWFLAKE_PASSWORD: "zgj1knc@mum.TRB5yzu"
+      SNOWFLAKE_ACCOUNT: to38000.eu-central-2.aws
     volumes:
       - D:/Downloads/big data/airflow:/opt/airflow/dags
     command: >
@@ -132,7 +135,10 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       AIRFLOW__WEBSERVER__SECRET_KEY: 'change_me_airflow_secret_key'
-      _PIP_ADDITIONAL_REQUIREMENTS: "yfinance==0.2.38 pandas pyyaml multitasking==0.0.9"
+      _PIP_ADDITIONAL_REQUIREMENTS: "yfinance==0.2.38 pandas pyyaml multitasking==0.0.9 snowflake-connector-python"
+      SNOWFLAKE_USER: mhmd1
+      SNOWFLAKE_PASSWORD: "zgj1knc@mum.TRB5yzu"
+      SNOWFLAKE_ACCOUNT: to38000.eu-central-2.aws
     volumes:
       - D:/Downloads/big data/airflow:/opt/airflow/dags
       - D:/Downloads/big data:/opt/project
@@ -154,7 +160,10 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       AIRFLOW__WEBSERVER__SECRET_KEY: 'change_me_airflow_secret_key'
-      _PIP_ADDITIONAL_REQUIREMENTS: "yfinance==0.2.38 pandas pyyaml multitasking==0.0.9"
+      _PIP_ADDITIONAL_REQUIREMENTS: "yfinance==0.2.38 pandas pyyaml multitasking==0.0.9 snowflake-connector-python"
+      SNOWFLAKE_USER: mhmd1
+      SNOWFLAKE_PASSWORD: "zgj1knc@mum.TRB5yzu"
+      SNOWFLAKE_ACCOUNT: to38000.eu-central-2.aws
     volumes:
       - D:/Downloads/big data/airflow:/opt/airflow/dags
       - D:/Downloads/big data:/opt/project
