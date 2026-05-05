@@ -47,6 +47,7 @@ Power BI
 
 Airflow DAG runs daily at 10 PM (Sun-Thu)
 All services run in Docker (10 containers)
+Optional: realtime_ingest.py for continuous polling
 ```
 
 ## Tech Stack
@@ -126,6 +127,15 @@ CREATE TABLE IF NOT EXISTS MARKET_DWH.GOLD.FACT_MARKET_TRADES (
    ```
 5. Trigger DAG at http://localhost:8081 (admin/admin)
 
+## Real-Time Ingestion (Optional)
+
+Use the real-time script to poll Yahoo Finance and append the latest OHLCV data
+to the raw layer between scheduled DAG runs.
+
+```powershell
+python ingestion/realtime_ingest.py
+```
+
 ## Access UIs
 
 - HDFS NameNode: http://localhost:9870
@@ -139,7 +149,8 @@ big-data-pipeline/
 ├── airflow/
 │   └── dag.py
 ├── ingestion/
-│   └── ingest.py
+│   ├── ingest.py
+│   └── realtime_ingest.py
 ├── processing/
 │   └── spark_transform.py
 ├── validation/
