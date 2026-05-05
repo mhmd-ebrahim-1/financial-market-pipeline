@@ -11,6 +11,13 @@ University graduation project — Faculty of AI, Kafr El-Sheikh University
 Student: Mohamed Ebrahim | Cohort: 2023-2027
 GitHub: https://github.com/mhmd-ebrahim-1/financial-market-pipeline
 
+![Pipeline Architecture](docs/architecture_diagram.svg)
+
+## Project Overview
+
+A production-style Big Data pipeline that ingests market data, processes it with
+Spark, models a star schema, loads to Snowflake, and powers dashboards in Power BI.
+
 ## Data Source
 
 - Provider: Yahoo Finance (via yfinance Python library)
@@ -80,28 +87,28 @@ CREATE DATABASE IF NOT EXISTS MARKET_DWH;
 CREATE SCHEMA IF NOT EXISTS MARKET_DWH.GOLD;
 
 CREATE TABLE IF NOT EXISTS MARKET_DWH.GOLD.DIM_STOCKS (
-    TICKERID NUMBER,
-    SYMBOL STRING,
-    COMPANYNAME STRING
+  TICKERID NUMBER,
+  SYMBOL STRING,
+  COMPANYNAME STRING
 );
 
 CREATE TABLE IF NOT EXISTS MARKET_DWH.GOLD.DIM_DATE (
-    DATEID NUMBER,
-    FULLDATE DATE,
-    YEAR NUMBER,
-    MONTH NUMBER,
-    DAY NUMBER
+  DATEID NUMBER,
+  FULLDATE DATE,
+  YEAR NUMBER,
+  MONTH NUMBER,
+  DAY NUMBER
 );
 
 CREATE TABLE IF NOT EXISTS MARKET_DWH.GOLD.FACT_MARKET_TRADES (
-    TRADEID NUMBER,
-    TICKERID NUMBER,
-    DATEID NUMBER,
-    OPENPRICE FLOAT,
-    CLOSEPRICE FLOAT,
-    VOLUME NUMBER,
-    MA_7 FLOAT,
-    RSI FLOAT
+  TRADEID NUMBER,
+  TICKERID NUMBER,
+  DATEID NUMBER,
+  OPENPRICE FLOAT,
+  CLOSEPRICE FLOAT,
+  VOLUME NUMBER,
+  MA_7 FLOAT,
+  RSI FLOAT
 );
 ```
 
@@ -164,6 +171,7 @@ big-data-pipeline/
 │   ├── docker-compose.yml
 │   └── hadoop.env
 ├── docs/
+│   ├── architecture_diagram.svg
 │   └── images/
 ├── data/
 │   ├── raw/
