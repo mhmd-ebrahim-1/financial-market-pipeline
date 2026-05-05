@@ -7,9 +7,7 @@
 ![Snowflake](https://img.shields.io/badge/Snowflake-MARKET_DWH.GOLD-29B5E8?logo=snowflake&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-10%20containers-2496ED?logo=docker&logoColor=white)
 
-University graduation project — Faculty of AI, Kafr El-Sheikh University
-Student: Mohamed Ebrahim | Cohort: 2023-2027
-GitHub: https://github.com/mhmd-ebrahim-1/financial-market-pipeline
+
 
 ![Pipeline Architecture](docs/architecture_diagram.svg)
 
