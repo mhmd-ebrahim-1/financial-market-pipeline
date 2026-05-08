@@ -2,7 +2,7 @@
 
 ## 1) Overview | نبذة سريعة
 مشروع تخرج لكلية الذكاء الاصطناعي، جامعة كفر الشيخ. خط معالجة بيانات سوق المال
-من المصدر حتى التحليل داخل Snowflake وPower BI.
+من المصدر حتى التحليل داخل Snowflake و Power BI.
 
 **Project:** Financial Market Big Data Pipeline
 **Student:** Mohamed Ebrahim | **Cohort:** 2023-2027
@@ -10,7 +10,7 @@
 
 **Main Flow:**
 - Yahoo Finance -> Python ETL -> HDFS Raw
-- Spark Transform (MA7, RSI) -> Star Schema + Curated
+- Spark Transform (MA7, RSI) -> Star Schema (Fact + Dim)
 - Validation (quality checks)
 - Load to Snowflake (MARKET_DWH.GOLD)
 - Visualization (Power BI)
@@ -25,8 +25,9 @@
 ## 2) Data Source | مصدر البيانات
 - Provider: Yahoo Finance (via yfinance)
 - Symbols: AAPL, MSFT, BTC-USD
-- Date Range: 2023-01-01 to 2026-04-26
-- Total Records: 2,872 daily OHLCV
+- Interval: 1 day
+- Date Range: يبدأ من 2023-01-01 لحد اليوم
+- Total Records: تقريبا 2,872 صف يومي (يتغير حسب تاريخ التشغيل)
 - Links:
   - https://finance.yahoo.com/quote/AAPL/history/
   - https://finance.yahoo.com/quote/MSFT/history/
@@ -34,7 +35,7 @@
 
 ---
 
-## 3) Project Structure | هيكل المشروع
+## 3) Full Project Structure | هيكل المشروع بالكامل
 ```
 config.yaml
 requirements.txt
@@ -66,36 +67,150 @@ data/
   powerbi/
 docs/
   architecture_diagram.svg
+  images/
+docker/
+  docker-compose.yml
+  hadoop.env
 ```
 
-**أهم الملفات:**
-- `airflow/dag.py`: تعريف الـ DAG وخط التشغيل.
-- `ingestion/ingest.py`: جلب البيانات من Yahoo Finance.
-- `ingestion/realtime_ingest.py`: Real-time polling بين الـ DAG runs.
-- `ingestion/upload_to_hdfs.py`: رفع الـ raw data إلى HDFS.
-- `processing/spark_transform.py`: تحويل البيانات إلى Fact/Dim + Curated.
-- `validation/quality_checks.py`: فحوصات الجودة.
-- `loading/load_to_snowflake.py`: تحميل فعلي إلى Snowflake.
-- `config.yaml`: إعدادات عامة.
-- `state/state.json`: آخر تاريخ تم ingestion له.
+---
+
+## 4) Configuration | ملف الإعدادات config.yaml
+الملف ده هو مصدر الحقيقة لأي تشغيل:
+
+- `project.timezone`: المنطقة الزمنية للمشروع.
+- `market.tickers`: الرموز المستهدفة (AAPL/MSFT/BTC-USD).
+- `market.default_start_date`: أول تاريخ للتحميل.
+- `market.interval`: الفاصل الزمني للبيانات (1d).
+- `features.ma_window_days`: نافذة المتوسط المتحرك (MA7).
+- `features.rsi_period_days`: نافذة RSI (14).
+- `paths.*`: مسارات الـ data داخل المشروع.
+- `validation.*`: إعدادات فحوصات الجودة.
+- `warehouse.*`: وضع التحميل (simulate / snowflake) وإعدادات الاتصال.
 
 ---
 
-## 4) Prerequisites | المتطلبات قبل التشغيل
-- Docker Desktop
-- Python 3.8+
-- Snowflake account (اختياري للتحويل الحقيقي)
-- Power BI (اختياري)
+## 5) File-by-File Explanation | شرح كل ملف كود
+
+### airflow/dag.py
+الـ DAG الأساسي ويحدد ترتيب المهام:
+1) `ingest_market_data`
+2) `spark_transform`
+3) `validate_data_quality`
+4) `load_to_warehouse`
+
+الجدولة: `0 22 * * 0-4` (10 مساء من الأحد للخميس).
+
+### ingestion/ingest.py
+المسؤول عن الـ batch ingestion:
+- يقرأ `state/state.json` لتجنب إعادة تنزيل نفس الأيام.
+- ينزل بيانات Yahoo Finance عبر `yfinance`.
+- يحفظ partitions محلية بنمط:
+  `data/raw/symbol=.../date=.../market_data.csv`.
+- يرفع نفس الملفات إلى HDFS عبر WebHDFS.
+
+### ingestion/realtime_ingest.py
+وضع real-time اختياري:
+- يسحب `fast_info` من yfinance كل 15 دقيقة.
+- يكتب ملفات صغيرة على HDFS في:
+  `/data/realtime/symbol=.../date=.../HHMMSS.csv`.
+- مفيد للديمو فقط، مش جزء من الـ DAG الأساسي.
+
+### ingestion/upload_to_hdfs.py
+سكريبت مساعد لرفع البيانات المحلية إلى HDFS:
+- يمشي على `data/raw` ويرفع كل partition.
+- يعالج مشكلة Hostname الخاص بالـ DataNode داخل Docker.
+
+### processing/spark_transform.py
+قلب المعالجة بالـ PySpark:
+- يقرأ الـ raw partitions من `data/raw` (local داخل container).
+- ينظف الأعمدة ويحاول تحويل القيم إلى double.
+- يحسب MA7 و RSI باستخدام Window Functions.
+- يبني Star Schema:
+  - Dim_Stocks
+  - Dim_Date
+  - Fact_Market_Trades
+- يكتب ملفات CSV في `data/warehouse`.
+
+ملاحظة مهمة: السكريبت حاليا لا يكتب `market_data_curated.csv`.
+لو عايز التحقق الكامل في خطوة الـ validation، لازم وجود ملف curated
+يدويا أو تحديث السكريبت لاحقا.
+
+### validation/quality_checks.py
+مدقق جودة البيانات:
+- يتحقق من null ratio.
+- uniqueness للـ PKs.
+- integrity للـ FKs.
+- Domain checks (RSI, Volume, ClosePrice).
+- minimum rows.
+
+مهم: المدقق يتوقع وجود:
+`data/curated/market_data_curated.csv`
+وفي حال عدم وجوده، سيحدث فشل.
+
+### loading/load.py
+لودر رئيسي للـ warehouse وله وضعين:
+- **simulate**: ينشئ SQL فقط في `loading/sql/ddl.sql`.
+- **snowflake**: ينفذ DDL ويكتب البيانات عبر `write_pandas`.
+
+يقرأ إعدادات Snowflake من `config.yaml` ومن env vars.
+
+### loading/load_to_snowflake.py
+سكريبت مستقل لتحميل ملفات Power BI إلى Snowflake:
+- يستخدم مسار `data/powerbi`.
+- يحتوي بيانات اتصال ثابتة (تُعدل محليا).
+- مفيد عند تحضير الـ dashboard فقط.
+
+### loading/sql/ddl.sql
+تعريف جداول الـ DWH بصيغة Star Schema.
+
+### loading/sql/copy_into.sql
+سكريبت بديل للتحميل باستخدام COPY INTO بعد PUT للملفات.
+
+### utils/helpers.py
+مكتبة مساعدة:
+- قراءة config.yaml
+- read/write JSON
+- logging
+- حساب RSI (في حالة استخدام Pandas)
+- بناء الـ paths بناء على config
+
+### start.bat
+أبسط أمر لتشغيل المنظومة:
+`docker compose -f docker\docker-compose.yml up -d`
+
+### requirements.txt
+تعريف الحزم الرئيسية (yfinance, pandas, pyspark, airflow, snowflake connector).
 
 ---
 
-## 5) تشغيل المشروع خطوة بخطوة | Full Run Steps
+## 6) Data Directories | شرح مجلدات البيانات
+
+### data/raw
+ملفات الـ ingestion الخام مقسمة حسب symbol/date.
+كل ملف يحتوي OHLCV + timestamp.
+
+### data/warehouse
+الناتج النهائي للـ Star Schema:
+- Fact_Market_Trades.csv
+- Dim_Stocks.csv
+- Dim_Date.csv
+
+### data/curated
+مفترض يحتوي `market_data_curated.csv` + `validation_report.json`.
+
+### data/powerbi
+نسخة مهيأة للـ Power BI (dim_date, dim_stocks, fact_market_trades).
+
+---
+
+## 7) تشغيل المشروع خطوة بخطوة | Full Run Steps
 
 ### Step A: تشغيل الخدمات
 ```powershell
 cd "D:\Downloads\big data"
 cd docker
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Step B: ربط Airflow على شبكة Hadoop
@@ -117,7 +232,7 @@ python ingestion\upload_to_hdfs.py
 ### Step E: تشغيل الـ DAG من Airflow
 1) افتح Airflow UI: http://localhost:8081
 2) فعّل DAG `financial_market_pipeline`
-3) اضغط Run
+3) Trigger DAG
 
 **Airflow credentials** (لو اتعملت):
 - Username: admin
@@ -125,160 +240,55 @@ python ingestion\upload_to_hdfs.py
 
 ---
 
-## 6) Access UIs | الروابط
+## 8) Access UIs | الروابط
 - HDFS NameNode: http://localhost:9870
 - Spark Master: http://localhost:8080
 - Airflow: http://localhost:8081
+- YARN ResourceManager: http://localhost:8088
 
 ---
 
-## 7) Ingestion | شرح الـ Ingestion
-**المصدر:** Yahoo Finance عبر `yfinance`.
-
-**المخرجات:**
-- Local raw data:
-  `data/raw/symbol=.../date=.../market_data.csv`
-- HDFS raw data:
-  `/data/raw/symbol=.../date=.../market_data.csv`
-
-**رفع إلى HDFS يدويًا:**
-```powershell
-python ingestion\upload_to_hdfs.py
-```
-
-**Real-Time Ingestion (Optional):**
-```powershell
-python ingestion\realtime_ingest.py
-```
-
-**فكرة الـ state.json:**
-- يمنع تنزيل نفس البيانات مرتين
-- يحفظ آخر تاريخ تم تنزيله لكل symbol
-
-**Reset state (لو عايز تحميل كامل):**
-```json
-{ "last_ingested": {} }
-```
-
----
-
-## 8) Spark Transform | شرح التحويل
-الملف: `processing/spark_transform.py`
-
-**بيعمل:**
-- قراءة raw data من local partitions
-- تنظيف وتطبيع الأعمدة
-- حساب MA7 و RSI
-- إنشاء Dim_Stocks, Dim_Date, Fact_Market_Trades
-- إخراج CSVs
-
-**المخرجات:**
-- `data/warehouse/Fact_Market_Trades.csv`
-- `data/warehouse/Dim_Stocks.csv`
-- `data/warehouse/Dim_Date.csv`
-- `data/curated/market_data_curated.csv`
-
-**تشغيل يدوي:**
-```powershell
-docker exec -it spark-master /opt/spark/bin/spark-submit --master local[*] /opt/project/processing/spark_transform.py
-```
-
----
-
-## 9) Validation | شرح التحقق من الجودة
-الملف: `validation/quality_checks.py`
-
-**Checks:**
-- Null ratio
-- Primary key uniqueness
-- Foreign key integrity
-- Domain checks (RSI range, volume >= 0)
-- Minimum row count
-
-**Output:**
-`data/curated/validation_report.json`
-
-**مثال Summary متوقع:**
-```
-"status": "passed",
-"error_count": 0
-```
-
----
-
-## 10) Loading | تحميل البيانات
-
-### A) Simulate (افتراضي)
-- يولد SQL في:
-  `loading/sql/ddl.sql`
-  `loading/sql/copy_into.sql`
-
-### B) Snowflake (لو عايز تفعيل حقيقي)
+## 9) Snowflake Setup | إعداد Snowflake
 **Target:** `MARKET_DWH.GOLD`
 
-```sql
-CREATE DATABASE IF NOT EXISTS MARKET_DWH;
-CREATE SCHEMA IF NOT EXISTS MARKET_DWH.GOLD;
-
-CREATE TABLE IF NOT EXISTS MARKET_DWH.GOLD.DIM_STOCKS (
-  TICKERID NUMBER,
-  SYMBOL STRING,
-  COMPANYNAME STRING
-);
-
-CREATE TABLE IF NOT EXISTS MARKET_DWH.GOLD.DIM_DATE (
-  DATEID NUMBER,
-  FULLDATE DATE,
-  YEAR NUMBER,
-  MONTH NUMBER,
-  DAY NUMBER
-);
-
-CREATE TABLE IF NOT EXISTS MARKET_DWH.GOLD.FACT_MARKET_TRADES (
-  TRADEID NUMBER,
-  TICKERID NUMBER,
-  DATEID NUMBER,
-  OPENPRICE FLOAT,
-  CLOSEPRICE FLOAT,
-  VOLUME NUMBER,
-  MA_7 FLOAT,
-  RSI FLOAT
-);
-```
-
-في `config.yaml` (مثال):
-```
-warehouse:
-  mode: snowflake
-  database: MARKET_DWH
-  schema: GOLD
-  warehouse_name: COMPUTE_WH
-  role: SYSADMIN
-  user_env_var: SNOWFLAKE_USER
-  password_env_var: SNOWFLAKE_PASSWORD
-  account_env_var: SNOWFLAKE_ACCOUNT
-```
-
-ثم ضبط الـ env vars:
+إعداد env vars:
 ```powershell
 $env:SNOWFLAKE_USER="<user>"
 $env:SNOWFLAKE_PASSWORD="<password>"
 $env:SNOWFLAKE_ACCOUNT="to38000.eu-central-2.aws"
 ```
 
+ثم تأكد أن `config.yaml` مضبوط على:
+```
+warehouse:
+  mode: snowflake
+  database: MARKET_DWH
+  schema: GOLD
+  warehouse_name: COMPUTE_WH
+  role: ACCOUNTADMIN
+  user_env_var: SNOWFLAKE_USER
+  password_env_var: SNOWFLAKE_PASSWORD
+  account_env_var: SNOWFLAKE_ACCOUNT
+```
+
 ---
 
-## 11) Tech Stack | التقنيات
-- Python 3.8, yfinance, pandas, snowflake-connector-python
-- Apache Hadoop (HDFS) — namenode, datanode
-- Apache Spark (PySpark) — MA7, RSI
-- Apache Airflow — DAG: financial_market_pipeline
-- Snowflake (Free Trial) — account: to38000.eu-central-2.aws
-- Docker Desktop (Windows) — 10 containers
+## 10) Validation | شرح التحقق من الجودة
+الملف: `validation/quality_checks.py`
+
+**Checks:**
+- Null ratio
+- Primary key uniqueness
+- Foreign key integrity
+- Domain checks (RSI range, volume >= 0, closeprice > 0)
+- Minimum row count
+
+**Output:**
+`data/curated/validation_report.json`
 
 ---
 
-## 12) Testing | الاختبار النهائي (عند التسليم)
+## 11) Testing | الاختبار النهائي (عند التسليم)
 
 ### Test 1: HDFS Raw موجود
 ```powershell
@@ -303,14 +313,14 @@ SELECT COUNT(*) FROM MARKET_DWH.GOLD.DIM_DATE;
 SELECT COUNT(*) FROM MARKET_DWH.GOLD.DIM_STOCKS;
 SELECT COUNT(*) FROM MARKET_DWH.GOLD.FACT_MARKET_TRADES;
 ```
-**Expected:**
+**Expected (تقريبي):**
 - DIM_STOCKS = 3
 - DIM_DATE ~ 1212
 - FACT_MARKET_TRADES ~ 2872
 
 ---
 
-## 13) Common Errors | أشهر المشاكل وحلولها
+## 12) Common Errors | أشهر المشاكل وحلولها
 
 ### مشكلة: Invalid login في Airflow
 **حل:**
@@ -341,7 +351,7 @@ python ingestion\upload_to_hdfs.py
 
 ---
 
-## 14) FAQ | أسئلة متوقعة من الدكتور
+## 13) FAQ | أسئلة متوقعة من الدكتور
 
 **Q: ليه بتخزن Local + HDFS؟**
 A: Local للتصحيح والتطوير السريع، وHDFS لتخزين Big Data وتكامل Spark/Hadoop.
@@ -360,7 +370,7 @@ A: يتم استخدام `state.json` لتتبع آخر تاريخ، وممكن 
 
 ---
 
-## 15) Final Checklist | تشيك ليست التسليم
+## 14) Final Checklist | تشيك ليست التسليم
 - [ ] Airflow DAG كله Success
 - [ ] HDFS `/data/raw` موجود
 - [ ] ملفات warehouse موجودة
@@ -369,11 +379,11 @@ A: يتم استخدام `state.json` لتتبع آخر تاريخ، وممكن 
 
 ---
 
-## 16) Commands Quick Reference | أوامر سريعة
+## 15) Commands Quick Reference | أوامر سريعة
 ```powershell
 # تشغيل الخدمات
 cd docker
-docker-compose up -d
+docker compose up -d
 
 # ربط Airflow بالشبكة
 docker network connect docker-hadoop_hadoop_network airflow-webserver
