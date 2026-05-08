@@ -1,0 +1,51 @@
+تمام، ده أبسط ملخص لتشغيل المشروع 👇
+
+---
+
+## 🚀 تشغيل المشروع (في 3 خطوات)
+
+### 1) شغّل Docker Desktop
+
+* لازم يكون **Engine running**
+
+---
+
+### 2) شغّل الخدمات
+
+```powershell
+.\start.bat
+```
+
+أو:
+
+```powershell
+cd docker
+docker compose up -d
+```
+
+---
+
+### 3) شغّل البايبلاين
+
+* افتح: [http://localhost:8081](http://localhost:8081)
+* login: `admin / admin`
+* فعّل DAG → اضغط **Trigger**
+
+---
+
+## ✅ خلاص كدا
+
+البايبلاين هيشتغل:
+**Ingest → Spark → Validate → Load → Power BI**
+
+---
+
+## 🔗 روابط مهمة
+
+* Airflow: [http://localhost:8081](http://localhost:8081)
+* HDFS: [http://localhost:9870](http://localhost:9870)
+* Spark: [http://localhost:8080](http://localhost:8080)
+
+---
+
+ده كل اللي محتاجه 💯
