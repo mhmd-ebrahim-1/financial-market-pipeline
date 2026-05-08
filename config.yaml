@@ -20,6 +20,8 @@ paths:
   warehouse: data/warehouse
   state_file: state/state.json
   validation_report: data/curated/validation_report.json
+  hdfs_raw: hdfs://namenode:9000/data/raw
+  hdfs_curated: hdfs://namenode:9000/data/curated
 
 validation:
   enabled: true
@@ -36,3 +38,12 @@ warehouse:
   user_env_var: SNOWFLAKE_USER
   password_env_var: SNOWFLAKE_PASSWORD
   account_env_var: SNOWFLAKE_ACCOUNT
+
+hdfs:
+  namenode_uri: hdfs://namenode:9000
+
+spark:
+  master: spark://spark-master:7077
+  deploy_mode: client
+  conn_id: spark_default
+  application: /opt/project/processing/spark_transform.py
