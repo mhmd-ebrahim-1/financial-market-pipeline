@@ -26,7 +26,7 @@
 
 ## 🏗️ Architecture
 
-![Pipeline Architecture](docs/architecture_diagram.svg)
+![Pipeline Architecture](docs/images/2.png)
 
 ```
 Yahoo Finance API
