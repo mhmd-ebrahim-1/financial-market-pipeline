@@ -1,18 +1,42 @@
+import os
+
 import snowflake.connector
 from snowflake.connector.pandas_tools import write_pandas
 import pandas as pd
 
+SNOWFLAKE_ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT")
+SNOWFLAKE_USER = os.getenv("SNOWFLAKE_USER")
+SNOWFLAKE_PASSWORD = os.getenv("SNOWFLAKE_PASSWORD")
+SNOWFLAKE_DATABASE = os.getenv("SNOWFLAKE_DATABASE", "MARKET_DWH")
+SNOWFLAKE_SCHEMA = os.getenv("SNOWFLAKE_SCHEMA", "GOLD")
+SNOWFLAKE_WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE", "COMPUTE_WH")
+
+missing_envs = [
+    name
+    for name, value in {
+        "SNOWFLAKE_ACCOUNT": SNOWFLAKE_ACCOUNT,
+        "SNOWFLAKE_USER": SNOWFLAKE_USER,
+        "SNOWFLAKE_PASSWORD": SNOWFLAKE_PASSWORD,
+    }.items()
+    if not value
+]
+
+if missing_envs:
+    raise EnvironmentError(
+        "Missing required environment variables: " + ", ".join(missing_envs)
+    )
+
 conn = snowflake.connector.connect(
-    account="to38000.eu-central-2.aws",
-    user="mhmd1",
-    password="zgj1knc@mum.TRB5yzu",
-    database="MARKET_DWH",
-    schema="GOLD",
-    warehouse="COMPUTE_WH"
+    account=SNOWFLAKE_ACCOUNT,
+    user=SNOWFLAKE_USER,
+    password=SNOWFLAKE_PASSWORD,
+    database=SNOWFLAKE_DATABASE,
+    schema=SNOWFLAKE_SCHEMA,
+    warehouse=SNOWFLAKE_WAREHOUSE,
 )
 print("Connected to Snowflake!")
 
-DATA_PATH = r"D:\Downloads\big data\data\powerbi"
+DATA_PATH = os.getenv("POWERBI_DATA_PATH", r"D:\Downloads\big data\data\powerbi")
 
 # 1. DIM_STOCKS
 df = pd.read_csv(f"{DATA_PATH}\\dim_stocks.csv")

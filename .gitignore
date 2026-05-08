@@ -38,6 +38,7 @@ __pycache__/
 *.pyo
 *.log
 .DS_Store
+spark_output.log
 
 # Runtime state
 state/*.json
