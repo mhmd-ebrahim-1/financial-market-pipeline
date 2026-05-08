@@ -2,7 +2,9 @@
 dag.py
 ======
 Airflow DAG للـ financial market pipeline.
-يشغّل الـ pipeline كل يوم 10pm (الأحد - الخميس).
+
+تشغيل:
+    كل 15 دقيقة
 
 Pipeline:
     ingest → spark_transform → validate → load
@@ -19,16 +21,16 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 
 # ─────────────────────────────────────────
-# Project Path - داخل الـ container بيكون /opt/project
+# Project Path (داخل الـ container)
 # ─────────────────────────────────────────
 PROJECT_ROOT = Path('/opt/project')
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from ingestion.ingest import MarketDataIngestor        # noqa: E402
-from loading.load import WarehouseLoader               # noqa: E402
-from validation.quality_checks import DataQualityValidator  # noqa: E402
-from utils.helpers import build_project_paths, load_config  # noqa: E402
+from ingestion.ingest import MarketDataIngestor
+from loading.load import WarehouseLoader
+from validation.quality_checks import DataQualityValidator
+from utils.helpers import build_project_paths, load_config
 
 CONFIG_PATH = PROJECT_ROOT / "config.yaml"
 
@@ -45,16 +47,11 @@ def _load_context():
 # Tasks
 # ─────────────────────────────────────────
 def ingestion_task():
-    """جلب البيانات من Yahoo Finance وحفظها في HDFS raw layer."""
     config, paths = _load_context()
     MarketDataIngestor(config, paths).run()
 
 
 def spark_transform_task():
-    """
-    تشغيل spark_transform.py داخل spark-master container بـ spark-submit.
-    ده بيستبدل الـ Pandas transform بـ PySpark حقيقي على HDFS.
-    """
     result = subprocess.run(
         [
             "docker", "exec", "spark-master",
@@ -76,13 +73,11 @@ def spark_transform_task():
 
 
 def validate_task():
-    """التحقق من جودة البيانات بعد الـ transform."""
     config, paths = _load_context()
     DataQualityValidator(config, paths).run()
 
 
 def load_task():
-    """تحميل البيانات للـ warehouse النهائي."""
     config, paths = _load_context()
     WarehouseLoader(config, paths).run()
 
@@ -93,17 +88,22 @@ def load_task():
 default_args = {
     "owner": "data-engineering",
     "depends_on_past": False,
-    "retries": 2,
-    "retry_delay": timedelta(minutes=5),
+    "retries": 1,                     # خففنا retries عشان الضغط
+    "retry_delay": timedelta(minutes=2),
 }
 
 with DAG(
     dag_id="financial_market_pipeline",
     default_args=default_args,
-    description="Daily financial market ETL/ELT pipeline - Hadoop + Spark",
-    schedule="0 22 * * 0-4",   # كل يوم 10pm الأحد للخميس
+    description="Financial market ETL pipeline - runs every 15 minutes",
+    
+    # 🔥 التعديل المهم هنا
+    schedule="*/15 * * * *",   # كل 15 دقيقة
+    
     start_date=datetime(2025, 1, 1),
     catchup=False,
+    max_active_runs=1,         # يمنع تراكم الرنز
+    
     tags=["finance", "etl", "spark", "hdfs"],
 ) as dag:
 
@@ -127,5 +127,5 @@ with DAG(
         python_callable=load_task,
     )
 
-    # Pipeline order
+    # ترتيب البايبلاين
     ingest >> transform >> validate >> load
