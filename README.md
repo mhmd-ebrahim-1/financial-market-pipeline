@@ -11,7 +11,6 @@
 
 **A production-style end-to-end Big Data pipeline for financial market analytics**
 
-*Faculty of Artificial Intelligence — Kafr El-Sheikh University | Graduation Project 2023–2027*
 
 </div>
 
@@ -266,10 +265,3 @@ docker cp processing/spark_transform.py spark-master:/opt/spark_transform.py
 
 ---
 
-## 👤 Author
-
-**Mohamed Ebrahim**
-Faculty of Artificial Intelligence — Kafr El-Sheikh University
-Cohort 2023–2027
-
-[![GitHub](https://img.shields.io/badge/GitHub-mhmd--ebrahim--1-181717?style=flat&logo=github)](https://github.com/mhmd-ebrahim-1)
